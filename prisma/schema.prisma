@@ -1,0 +1,110 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model AdminUser {
+  id             String   @id @default(cuid())
+  email          String   @unique
+  passwordHash   String
+  encryptedPhone String?
+  createdAt      DateTime @default(now())
+}
+
+model ScheduleConfig {
+  id              String   @id @default("singleton")
+  intervalValue   Int      @default(1)
+  intervalUnit    String   @default("days")
+  graceValue      Int      @default(4)
+  graceUnit       String   @default("hours")
+  checkInChannels String   @default("[\"email\"]")
+  timezone        String   @default("UTC")
+  isPaused        Boolean  @default(true)
+  updatedAt       DateTime @updatedAt
+}
+
+model Contact {
+  id             String                 @id @default(cuid())
+  name           String
+  relationship   String?
+  encryptedEmail String?
+  encryptedPhone String?
+  createdAt      DateTime               @default(now())
+  actions        ActionConfig[]
+}
+
+model ActionConfig {
+  id              String                 @id @default(cuid())
+  label           String
+  type            String
+  contactId       String?
+  contact         Contact?               @relation(fields: [contactId], references: [id])
+  messageTemplate String?
+  encryptedConfig String?
+  createdAt       DateTime               @default(now())
+  stepLinks       EscalationStepAction[]
+}
+
+model EscalationStep {
+  id         String                 @id @default(cuid())
+  order      Int                    @unique
+  label      String
+  delayValue Int
+  delayUnit  String
+  isFinal    Boolean                @default(false)
+  createdAt  DateTime               @default(now())
+  actions    EscalationStepAction[]
+}
+
+model EscalationStepAction {
+  id       String         @id @default(cuid())
+  stepId   String
+  step     EscalationStep @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  actionId String
+  action   ActionConfig   @relation(fields: [actionId], references: [id], onDelete: Cascade)
+
+  @@unique([stepId, actionId])
+}
+
+model CheckInCycle {
+  id               String         @id @default(cuid())
+  status           String         @default("waiting")
+  dueAt            DateTime
+  startedAt        DateTime       @default(now())
+  resolvedAt       DateTime?
+  currentStepIndex Int            @default(-1)
+  nextStepAt       DateTime?
+  createdAt        DateTime       @default(now())
+  tokens           CheckInToken[]
+  events           EventLog[]
+}
+
+model CheckInToken {
+  id        String       @id @default(cuid())
+  cycleId   String
+  cycle     CheckInCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  token     String       @unique
+  createdAt DateTime     @default(now())
+  usedAt    DateTime?
+}
+
+model EventLog {
+  id        String        @id @default(cuid())
+  cycleId   String?
+  cycle     CheckInCycle? @relation(fields: [cycleId], references: [id])
+  type      String
+  detail    String?
+  createdAt DateTime      @default(now())
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+}
