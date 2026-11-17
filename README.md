@@ -120,14 +120,17 @@ intentionally so. Serverless cron (e.g. Vercel Cron) has coarse granularity
 and no strong guarantee it won't be delayed by a cold start, which is a bad
 trade for a safety tool.
 
-Recommended: deploy to a host that runs persistent containers/processes
-(Fly.io, Railway, Render, a small VPS, etc.) with **two processes**:
+Recommended: deploy to a host that runs a persistent container (Fly.io,
+Railway, Render, a small VPS, etc.) — not a serverless/edge platform.
 
-- `npm run build && npm run start` — the web app
-- `npm run worker` — the scheduler (same codebase, same `.env`, same
-  database)
-
-Both need the same `DATABASE_URL`, `MASTER_KEY`, and `SESSION_SECRET`.
+In production, `npm run build && npm run start` runs **both** the web app
+and the scheduler worker together as one process (via `concurrently`),
+so they always share the same container and the same SQLite file. (In
+local development you instead run `npm run dev` and `npm run worker` in
+two separate terminals — that's just for clearer logs while coding; it
+isn't required in production and the two processes there would otherwise
+need to share a disk across separate services, which most hosts don't do
+by default.)
 
 For production:
 
@@ -139,6 +142,27 @@ For production:
   change — the schema and app code don't assume SQLite specifically.)
 - Set `NODE_ENV=production` (most hosts do this automatically) so session
   cookies are marked `Secure`.
+
+### Railway, step by step
+
+1. New Project → Deploy from GitHub repo → pick this repo.
+2. Add a **Volume** to the service, mounted at `/app/prisma` (this is
+   where the SQLite file lives — without a volume it'd be wiped on every
+   redeploy).
+3. In the service's Variables tab, set at minimum `DATABASE_URL` (e.g.
+   `file:./prisma/dev.db`), `MASTER_KEY`, and `SESSION_SECRET` (generate
+   both the same way as local dev — `openssl rand -base64 32`). Add any of
+   the optional provider keys from `.env.example` you want live.
+4. Under Settings → Networking, generate a public domain for the service.
+   Copy it into an `APP_BASE_URL` variable as `https://that-domain`.
+5. Deploy. Railway runs `npm install` (which also runs `npx prisma db
+   push` the first time you shell into it — see below) then `npm run
+   build` then `npm run start`.
+6. One-time: open a shell for the service (Railway's "Shell" button, or
+   `railway run`) and run `npx prisma db push` once to create the database
+   on the volume. After that, redeploys keep the same data.
+7. Visit your new domain — it'll redirect you to `/setup` to create your
+   admin account, same as locally.
 
 ## What this is (and isn't)
 

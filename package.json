@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "concurrently -k \"npm:worker\" \"npm:start:web\"",
+    "start:web": "next start",
     "worker": "tsx src/worker/scheduler.ts",
     "lint": "eslint",
     "postinstall": "prisma generate"
@@ -15,6 +16,7 @@
     "@prisma/client": "^7.10.1",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^13.2.0",
+    "concurrently": "^10.0.7",
     "dotenv": "^18.0.10",
     "jose": "^6.2.17",
     "next": "16.4.6",
